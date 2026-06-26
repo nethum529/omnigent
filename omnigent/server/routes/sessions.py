@@ -9660,8 +9660,19 @@ async def _run_compact_locked(
 
         llm_config = LLMConfig(model=spec.executor.model, connection=spec.executor.connection)
     else:
+        # The runner did not compact in place (204 / no runner bound) and the
+        # spec pins no model, so the server's summary-based compaction has
+        # nothing to call. This is the common shape for SDK harnesses with no
+        # dedicated /compact handler (openai-agents, pi, goose, qwen, copilot)
+        # bound to a model-less agent. Name the harness and the fix instead of
+        # the raw, contextless error (#1192).
+        harness = spec.executor.harness_kind
         raise OmnigentError(
-            "Compaction requires a configured LLM model",
+            f"Compaction is unavailable for this session: the {harness!r} "
+            "harness did not compact its own context and this agent pins no "
+            "LLM model, so the server cannot run summary-based compaction "
+            "either. Set 'executor.model' (or 'llm.model') on the agent to "
+            "enable /compact.",
             code=ErrorCode.INVALID_INPUT,
         )
     task_id = f"compact_{int(time.time() * 1000)}"
